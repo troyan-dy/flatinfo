@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     # Nominatim требует ≤1 req/s. 0 — отключить (для тестов/своего инстанса).
     geocoder_min_interval: float = 1.0
 
+    # Кэш ответов в Redis. Необязательный: при недоступности Redis сервис
+    # работает без кэша (тихо деградирует). В compose host = "redis".
+    redis_url: str = "redis://localhost:6379/0"
+    cache_enabled: bool = True
+    cache_ttl: int = 86400  # сутки; рыночные оценки меняются медленно
+    # Короткий таймаут соединения: недоступный Redis не должен тормозить ответ.
+    cache_socket_timeout: float = 0.5
+
     # CORS: фронт на Next.js в дев-режиме.
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

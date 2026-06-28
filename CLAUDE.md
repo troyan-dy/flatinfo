@@ -37,8 +37,15 @@
 
 - `backend/app/` — `config.py` (pydantic-settings), `analysis.py` (модель, без I/O),
   `market_data.py` (таблицы стран/городов), `schemas.py` (Pydantic API),
-  `api.py` (роуты `/api/health`, `/api/analyze`), `services/` (geocode, market, advisor),
-  `main.py` (FastAPI + CORS).
+  `api.py` (роуты `/api/health`, `/api/analyze`), `services/` (geocode, market, advisor,
+  cache), `main.py` (FastAPI + CORS + lifespan для закрытия пула Redis).
+- Кэш ответов: `services/cache.py` — обёртка над `redis.asyncio`. Эндпоинт
+  `/api/analyze` кэширует весь `AnalyzeResponse` по ключу `analyze:v1:<sha256>` от
+  нормализованного запроса (адрес без регистра + overrides); расчёт детерминирован,
+  потому ответ кэшируем целиком. Redis **необязателен**: любая ошибка соединения
+  проглатывается (`redis_url`, `cache_enabled`, `cache_ttl` в `config.py`) — сервис
+  считает заново. Меняешь формулу/данные так, что старый кэш невалиден → подними
+  версию в префиксе ключа (`analyze:v1` → `analyze:v2`).
 - `frontend/app/` — `page.tsx` (**server component, SSR**: читает `searchParams`,
   зовёт бэкенд, рендерит вердикт), `NetWorthChart.tsx` (клиентский SVG-график),
   `AssumptionsForm.tsx` (клиентская форма допущений → пуш в URL → пересчёт на сервере).
