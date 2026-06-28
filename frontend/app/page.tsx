@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Overrides } from "@/lib/types";
 import ResultView from "./ResultView";
 import ResultSkeleton from "./ResultSkeleton";
+import SearchBox from "./SearchBox";
 
 export const dynamic = "force-dynamic";
 
@@ -66,19 +67,7 @@ export default async function Page({
         альтернативных вложений.
       </p>
 
-      <form className="search" method="GET" action="/">
-        <input
-          type="text"
-          name="address"
-          placeholder="Например: Москва, Тверская 7"
-          defaultValue={address}
-          autoComplete="off"
-          autoFocus
-        />
-        <button className="btn" type="submit">
-          Посчитать
-        </button>
-      </form>
+      <SearchBox defaultAddress={address} />
 
       <div className="examples">
         <span>Примеры:</span>

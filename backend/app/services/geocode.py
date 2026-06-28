@@ -104,3 +104,35 @@ async def geocode(address: str, client: httpx.AsyncClient | None = None) -> GeoL
     location = _parse(data[0])
     _cache_put(query.lower(), location)
     return location
+
+
+async def suggest(
+    query: str, limit: int = 5, client: httpx.AsyncClient | None = None
+) -> list[GeoLocation]:
+    """Несколько вариантов адреса для автодополнения. Ошибки → пустой список."""
+    q = query.strip()
+    if len(q) < 3:
+        return []
+
+    params = {
+        "q": q,
+        "format": "jsonv2",
+        "limit": str(max(1, min(limit, 10))),
+        "addressdetails": "1",
+    }
+    headers = {"User-Agent": settings.geocoder_user_agent}
+
+    own_client = client is None
+    client = client or httpx.AsyncClient(timeout=settings.geocoder_timeout)
+    try:
+        resp = await client.get(settings.geocoder_url, params=params, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+    except httpx.HTTPError as exc:
+        logger.warning("Geocoder suggest failed: {}", exc)
+        return []
+    finally:
+        if own_client:
+            await client.aclose()
+
+    return [_parse(item) for item in data if item.get("lat") and item.get("lon")]

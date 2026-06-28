@@ -27,6 +27,13 @@ class AnalyzeRequest(BaseModel):
     overrides: Overrides = Field(default_factory=Overrides)
 
 
+class Suggestion(BaseModel):
+    display_name: str
+    lat: float
+    lon: float
+    city: str | None
+
+
 class LocationOut(BaseModel):
     display_name: str
     lat: float

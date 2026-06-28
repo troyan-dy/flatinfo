@@ -132,6 +132,52 @@ a {
   border: 1px solid var(--border);
 }
 
+.searchbox {
+  position: relative;
+}
+
+.suggest {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  margin: 8px 0 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.suggest li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.suggest li.active {
+  background: var(--card-2);
+}
+
+.suggest li .pin {
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.suggest li .text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .examples {
   margin-top: 14px;
   display: flex;
