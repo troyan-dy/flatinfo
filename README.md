@@ -67,19 +67,24 @@ cd frontend && npm run typecheck && npm run build
 
 ## Деплой на сервере
 
-На сервере сервис живёт в Docker compose (redis + backend + frontend), а наружу
-смотрит общий **nginx** (reverse-proxy на :80/:443). Фронтенд и бэкенд публикуют
-порты только на loopback (`127.0.0.1:3000` / `:8000`) — снаружи их закрывает nginx,
-который разруливает запросы по доменному имени. Так на одном сервере уживается
-несколько сайтов: каждый — свой `server`-блок и свой внутренний порт.
+Прод: **https://flatinfo.duckdns.org**. На сервере сервис живёт в Docker compose
+(redis + backend + frontend), а наружу смотрит общий **nginx** (reverse-proxy на
+:80/:443) с сертификатом Let's Encrypt. Фронтенд и бэкенд публикуют порты только на
+loopback (`127.0.0.1:3000` / `:8000`) — снаружи их закрывает nginx, который
+разруливает запросы по доменному имени. Так на одном сервере уживается несколько
+сайтов: каждый — свой `server`-блок, свой домен и свой внутренний порт.
 
 ```
-Интернет :80/:443 ──► nginx ──(по server_name)──► 127.0.0.1:3000 (frontend) ──► backend
+Интернет :443 ──► nginx (TLS, по server_name) ──► 127.0.0.1:3000 (frontend) ──► backend
 ```
+
+Сервер маленький (~1 ГБ RAM, ~10 ГБ диск): для сборки включён swap (`/swapfile`,
+в `/etc/fstab`), а фронтенд собирается с `output: "standalone"` — иначе `next build`
+падает по памяти/диску.
 
 ### Первая установка
 
-Нужны Docker + плагин compose и nginx.
+Нужны Docker + плагин compose, nginx, certbot.
 
 ```bash
 # 1. Код (репозиторий публичный, ключи не нужны)
@@ -89,15 +94,43 @@ cd ~/flatinfo
 # 2. Поднять контейнеры
 docker compose up --build -d
 
-# 3. nginx: подключить конфиг и перезагрузить
+# 3. nginx: подключить конфиг (на старте — без TLS, см. ниже про HTTPS)
 ln -s ~/flatinfo/deploy/nginx/flatinfo.conf /etc/nginx/sites-enabled/flatinfo.conf
 rm -f /etc/nginx/sites-enabled/default      # убрать дефолтную заглушку nginx
 nginx -t && systemctl reload nginx
 ```
 
-Доступ — `http://<IP-сервера>`. Когда появится домен: прописать `server_name` в
-[`deploy/nginx/flatinfo.conf`](deploy/nginx/flatinfo.conf) и выпустить сертификат
-(`certbot --nginx -d flatinfo.example.com`).
+### HTTPS (Let's Encrypt, webroot)
+
+Конфиг [`deploy/nginx/flatinfo.conf`](deploy/nginx/flatinfo.conf) уже содержит TLS-блок
+и ссылается на сертификат — поэтому `nginx -t` пройдёт только **после** первого выпуска.
+Порядок на чистом сервере:
+
+```bash
+# Каталог для ACME-челленджа (его отдаёт nginx по /.well-known/acme-challenge/)
+mkdir -p /var/www/certbot
+
+# Первый выпуск через webroot (домен должен A-записью указывать на сервер).
+# Конфиг сертботом не правится (без --nginx) — он остаётся источником правды в git.
+certbot certonly --webroot -w /var/www/certbot -d flatinfo.duckdns.org \
+  --non-interactive --agree-tos -m you@example.com \
+  --deploy-hook "systemctl reload nginx"
+
+nginx -t && systemctl reload nginx   # теперь TLS-конфиг валиден
+```
+
+Продление автоматическое — таймер `certbot.timer` запускает `certbot renew`; webroot
+не требует простоя, `--deploy-hook` перезагружает nginx после обновления сертификата.
+Проверить: `certbot renew --dry-run`.
+
+### Файрвол
+
+Наружу открыты только SSH и web; всё остальное (включая loopback-порты контейнеров)
+недоступно из интернета:
+
+```bash
+ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw --force enable
+```
 
 ### Авто-деплой (cron)
 
