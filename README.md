@@ -24,6 +24,7 @@
 
 - **Бэкенд:** FastAPI, Pydantic, httpx, loguru. Менеджер пакетов — `uv`.
   Линт/типы/тесты: ruff + mypy + pytest (покрытие ≥85%).
+  Кэш ответов — Redis (необязательный: без него сервис просто пересчитывает).
 - **Фронтенд:** Next.js 15 (App Router, **SSR**), React 19, TypeScript. График —
   собственный SVG без тяжёлых зависимостей.
 
@@ -43,10 +44,15 @@ npm run dev
 
 Фронт ходит на бэкенд по `BACKEND_URL` (по умолчанию `http://localhost:8000`).
 
-Или всё сразу в Docker:
+Бэкенд кэширует ответы `/api/analyze` в Redis по адресу `REDIS_URL`
+(по умолчанию `redis://localhost:6379/0`). Redis не запущен — не страшно:
+кэш тихо отключается, каждый запрос считается заново. Выключить совсем —
+`CACHE_ENABLED=false`; время жизни записи — `CACHE_TTL` (сек, по умолчанию сутки).
+
+Или всё сразу в Docker (compose поднимает и Redis):
 
 ```bash
-docker compose up --build      # бэк :8000, фронт :3000
+docker compose up --build      # бэк :8000, фронт :3000, redis :6379
 ```
 
 Короткие команды — в `Makefile`: `make check` (lint+types+test бэка),

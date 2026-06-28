@@ -1,10 +1,18 @@
 services:
+  redis:
+    image: redis:7-alpine
+    # Кэш — эфемерный, том не нужен: потеря данных безопасна (всё пересчитается).
+    restart: unless-stopped
+
   backend:
     build: ./backend
     ports:
       - "8000:8000"
     environment:
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      REDIS_URL: "redis://redis:6379/0"
+    depends_on:
+      - redis
     restart: unless-stopped
 
   frontend:
