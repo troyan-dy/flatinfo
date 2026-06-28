@@ -14,6 +14,10 @@ import httpx
 from loguru import logger
 
 from app.config import settings
+from app.services.throttle import AsyncRateLimiter
+
+# Общий лимитер на все исходящие запросы к геокодеру (geocode + suggest).
+_limiter = AsyncRateLimiter(settings.geocoder_min_interval)
 
 
 @dataclass(frozen=True)
@@ -88,6 +92,7 @@ async def geocode(address: str, client: httpx.AsyncClient | None = None) -> GeoL
     own_client = client is None
     client = client or httpx.AsyncClient(timeout=settings.geocoder_timeout)
     try:
+        await _limiter.wait()
         resp = await client.get(settings.geocoder_url, params=params, headers=headers)
         resp.raise_for_status()
         data = resp.json()
@@ -125,6 +130,7 @@ async def suggest(
     own_client = client is None
     client = client or httpx.AsyncClient(timeout=settings.geocoder_timeout)
     try:
+        await _limiter.wait()
         resp = await client.get(settings.geocoder_url, params=params, headers=headers)
         resp.raise_for_status()
         data = resp.json()

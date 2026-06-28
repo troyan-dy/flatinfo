@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # Кэш геокодера: сколько результатов держать в памяти.
     geocode_cache_size: int = 512
 
+    # Троттлинг исходящих запросов к геокодеру (сек между запросами).
+    # Nominatim требует ≤1 req/s. 0 — отключить (для тестов/своего инстанса).
+    geocoder_min_interval: float = 1.0
+
     # CORS: фронт на Next.js в дев-режиме.
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
