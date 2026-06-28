@@ -11,6 +11,23 @@ const SYMBOLS: Record<string, string> = {
   CAD: "C$",
   AUD: "A$",
   CHF: "CHF",
+  SEK: "kr",
+  NOK: "kr",
+  DKK: "kr",
+  CZK: "Kč",
+  JPY: "¥",
+  CNY: "¥",
+  KRW: "₩",
+  SGD: "S$",
+  HKD: "HK$",
+  INR: "₹",
+  THB: "฿",
+  IDR: "Rp",
+  ILS: "₪",
+  BRL: "R$",
+  MXN: "MX$",
+  ZAR: "R",
+  UAH: "₴",
 };
 
 export function money(amount: number, currency: string): string {

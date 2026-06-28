@@ -48,6 +48,13 @@ const REC_LABEL: Record<string, string> = {
   neutral: "Примерно поровну",
 };
 
+function headline(rec: string, advantage: number, horizon: number, currency: string): string {
+  const sum = money(Math.abs(advantage), currency);
+  if (rec === "buy") return `Покупка выгоднее на ${sum}`;
+  if (rec === "rent") return `Аренда выгоднее на ${sum}`;
+  return `Разница всего ${sum} за ${horizon} лет`;
+}
+
 const SOURCE_NOTE: Record<string, string> = {
   city: "Оценка для конкретного города",
   country: "Оценка по стране (нет точных данных по городу) — проверьте цены и аренду",
@@ -115,7 +122,14 @@ export default async function Page({
         <>
           <div className={`verdict ${data.result.recommendation}`}>
             <span className="verdict-tag">{REC_LABEL[data.result.recommendation]}</span>
-            <h2>{REC_LABEL[data.result.recommendation]}</h2>
+            <h2>
+              {headline(
+                data.result.recommendation,
+                data.result.advantage,
+                data.result.horizon_years,
+                data.assumptions.currency,
+              )}
+            </h2>
             <div className="addr">{data.location.display_name}</div>
             <p className="summary">{data.summary}</p>
 
