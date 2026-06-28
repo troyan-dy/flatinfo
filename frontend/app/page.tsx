@@ -1,8 +1,7 @@
-import { analyze, AnalyzeError } from "@/lib/api";
+import { Suspense } from "react";
 import type { Overrides } from "@/lib/types";
-import { money, pct } from "@/lib/format";
-import NetWorthChart from "./NetWorthChart";
-import AssumptionsForm from "./AssumptionsForm";
+import ResultView from "./ResultView";
+import ResultSkeleton from "./ResultSkeleton";
 
 export const dynamic = "force-dynamic";
 
@@ -42,25 +41,6 @@ function parseOverrides(sp: SearchParams): Overrides {
   return ov;
 }
 
-const REC_LABEL: Record<string, string> = {
-  buy: "Выгоднее покупать",
-  rent: "Выгоднее снимать",
-  neutral: "Примерно поровну",
-};
-
-function headline(rec: string, advantage: number, horizon: number, currency: string): string {
-  const sum = money(Math.abs(advantage), currency);
-  if (rec === "buy") return `Покупка выгоднее на ${sum}`;
-  if (rec === "rent") return `Аренда выгоднее на ${sum}`;
-  return `Разница всего ${sum} за ${horizon} лет`;
-}
-
-const SOURCE_NOTE: Record<string, string> = {
-  city: "Оценка для конкретного города",
-  country: "Оценка по стране (нет точных данных по городу) — проверьте цены и аренду",
-  global: "Глобальная усреднённая оценка — обязательно подставьте реальные цифры",
-};
-
 export default async function Page({
   searchParams,
 }: {
@@ -71,15 +51,8 @@ export default async function Page({
   const address = (Array.isArray(addressRaw) ? addressRaw[0] : addressRaw)?.trim() ?? "";
   const overrides = parseOverrides(sp);
 
-  let data = null;
-  let error: string | null = null;
-  if (address) {
-    try {
-      data = await analyze(address, overrides);
-    } catch (e) {
-      error = e instanceof AnalyzeError ? e.message : "Неожиданная ошибка расчёта.";
-    }
-  }
+  // Ключ пересоздаёт Suspense-границу при каждом новом запросе → показывается скелетон.
+  const suspenseKey = JSON.stringify({ address, overrides });
 
   return (
     <main className="container">
@@ -116,111 +89,10 @@ export default async function Page({
         ))}
       </div>
 
-      {error && <div className="error">{error}</div>}
-
-      {data && (
-        <>
-          <div className={`verdict ${data.result.recommendation}`}>
-            <span className="verdict-tag">{REC_LABEL[data.result.recommendation]}</span>
-            <h2>
-              {headline(
-                data.result.recommendation,
-                data.result.advantage,
-                data.result.horizon_years,
-                data.assumptions.currency,
-              )}
-            </h2>
-            <div className="addr">{data.location.display_name}</div>
-            <p className="summary">{data.summary}</p>
-
-            <div className="metrics">
-              <div className="metric">
-                <div className="label">Капитал через {data.result.horizon_years} лет — покупка</div>
-                <div className="value buy">
-                  {money(data.result.buy_net_worth, data.assumptions.currency)}
-                </div>
-              </div>
-              <div className="metric">
-                <div className="label">Капитал через {data.result.horizon_years} лет — аренда</div>
-                <div className="value rent">
-                  {money(data.result.rent_net_worth, data.assumptions.currency)}
-                </div>
-              </div>
-              <div className="metric">
-                <div className="label">Точка окупаемости покупки</div>
-                <div className="value">
-                  {data.result.break_even_year
-                    ? `${data.result.break_even_year}-й год`
-                    : "за горизонтом"}
-                </div>
-              </div>
-              <div className="metric">
-                <div className="label">Платёж по ипотеке</div>
-                <div className="value">
-                  {money(data.result.monthly_mortgage, data.assumptions.currency)}/мес
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="section">
-            <h3>Как расходится капитал со временем</h3>
-            <p className="hint">
-              Линии — итоговое богатство в каждом сценарии: стоимость жилья за вычетом
-              остатка кредита и расходов на продажу (покупка) против вложенного первого
-              взноса и сэкономленной разницы (аренда).
-            </p>
-            <NetWorthChart
-              timeline={data.result.timeline}
-              currency={data.assumptions.currency}
-              breakEvenYear={data.result.break_even_year}
-            />
-          </div>
-
-          <div className="section">
-            <h3>Исходные данные</h3>
-            <p className="hint">Оценки рынка для этой локации, на которых построен расчёт.</p>
-            <table className="breakdown">
-              <tbody>
-                <tr>
-                  <td>Площадь</td>
-                  <td>{Math.round(data.assumptions.area_sqm)} м²</td>
-                </tr>
-                <tr>
-                  <td>Цена покупки</td>
-                  <td>{money(data.assumptions.home_price, data.assumptions.currency)}</td>
-                </tr>
-                <tr>
-                  <td>Аренда в месяц</td>
-                  <td>{money(data.assumptions.monthly_rent, data.assumptions.currency)}</td>
-                </tr>
-                <tr>
-                  <td>Ставка ипотеки</td>
-                  <td>{pct(data.assumptions.mortgage_rate)}</td>
-                </tr>
-                <tr>
-                  <td>Первый взнос</td>
-                  <td>{pct(data.assumptions.down_payment_pct)}</td>
-                </tr>
-                <tr>
-                  <td>Рост цен на жильё</td>
-                  <td>{pct(data.assumptions.home_appreciation)}/год</td>
-                </tr>
-                <tr>
-                  <td>Рост аренды</td>
-                  <td>{pct(data.assumptions.rent_growth)}/год</td>
-                </tr>
-                <tr>
-                  <td>Доходность вложений</td>
-                  <td>{pct(data.assumptions.investment_return)}/год</td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="source-note">{SOURCE_NOTE[data.assumptions.data_source]}</div>
-          </div>
-
-          <AssumptionsForm address={address} assumptions={data.assumptions} />
-        </>
+      {address && (
+        <Suspense key={suspenseKey} fallback={<ResultSkeleton />}>
+          <ResultView address={address} overrides={overrides} />
+        </Suspense>
       )}
 
       <div className="footer">
