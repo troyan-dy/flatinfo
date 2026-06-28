@@ -1,0 +1,34 @@
+# Прод-конфиг: НЕ собирает образы, а тянет готовые из GHCR (их собирает
+# GitHub Actions, см. .github/workflows/ci.yml). На сервере остаётся только
+# `docker compose -f docker-compose.prod.yml pull && up -d` — это и делает cron
+# (deploy/auto-update.sh). Локальная сборка — в обычном docker-compose.yml.
+services:
+  redis:
+    image: redis:7-alpine
+    # Кэш эфемерный: том не нужен, потеря безопасна (всё пересчитается).
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/troyan-dy/flatinfo-backend:latest
+    # Только loopback хоста: снаружи бэкенд закрыт, фронт ходит к нему по
+    # внутренней сети compose (http://backend:8000).
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Прод-домен: с него браузер может ходить на бэкенд напрямую.
+      CORS_ORIGINS: "https://flatinfo.duckdns.org"
+      REDIS_URL: "redis://redis:6379/0"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/troyan-dy/flatinfo-frontend:latest
+    # Только loopback хоста: наружу публикует общий nginx (см. deploy/nginx).
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      BACKEND_URL: "http://backend:8000"
+    depends_on:
+      - backend
+    restart: unless-stopped

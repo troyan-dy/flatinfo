@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 #
-# Авто-деплой: тянет master с GitHub и, если код изменился, пересобирает и
-# пересоздаёт контейнеры compose. redis эфемерный (тома нет) — пересоздание
-# безопасно, всё пересчитается. Запускается из cron раз в несколько минут.
-# Идемпотентен: если новых коммитов нет — тихо выходит, ничего не трогая.
+# Авто-деплой: тянет свежие образы из GHCR и, ТОЛЬКО если они изменились,
+# пересоздаёт контейнеры из docker-compose.prod.yml. Сборки на сервере больше
+# нет — образы собирает GitHub Actions (.github/workflows/ci.yml). redis
+# эфемерный (тома нет) — пересоздание безопасно, всё пересчитается.
+#
+# Запускается из cron раз в несколько минут. Идемпотентен: образы не менялись —
+# тихо выходит, ничего не трогая. git здесь не используется: docker-compose.prod.yml
+# кладётся на сервер один раз при установке (git clone), дальше нужны лишь образы.
 #
 set -euo pipefail
 
@@ -12,40 +16,36 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-BRANCH="master"
+COMPOSE=(docker compose -f docker-compose.prod.yml)
 LOG="$SCRIPT_DIR/auto-update.log"
 LOCK="$SCRIPT_DIR/.auto-update.lock"
 
 log() { echo "[$(date '+%F %T')] $*" >>"$LOG"; }
 
-# Защита от наложения запусков: если предыдущий ещё идёт (долгая сборка) — выходим.
+# Защита от наложения запусков: если предыдущий pull ещё идёт — выходим.
 exec 9>"$LOCK"
 if ! flock -n 9; then
   log "previous run still in progress, skip"
   exit 0
 fi
 
-# Тянем с GitHub, не меняя рабочую копию.
-git fetch --quiet origin "$BRANCH"
+# Имена образов из compose-файла и их текущие локальные ID — снимок «до».
+images="$("${COMPOSE[@]}" config --images)"
+before="$(docker image inspect --format '{{.Id}}' $images 2>/dev/null | sort || true)"
 
-LOCAL="$(git rev-parse HEAD)"
-REMOTE="$(git rev-parse "origin/$BRANCH")"
+# Тянем свежие образы из реестра (тихо).
+"${COMPOSE[@]}" pull --quiet >>"$LOG" 2>&1
 
-# Код не изменился — обычный случай, выходим тихо (лог не засоряем).
-if [ "$LOCAL" = "$REMOTE" ]; then
+after="$(docker image inspect --format '{{.Id}}' $images 2>/dev/null | sort || true)"
+
+# Образы не изменились — обычный случай, выходим тихо (лог не засоряем).
+if [ "$before" = "$after" ]; then
   exit 0
 fi
 
-log "update detected: ${LOCAL:0:7} -> ${REMOTE:0:7}"
+log "new images pulled, recreating containers..."
+"${COMPOSE[@]}" up -d >>"$LOG" 2>&1
+log "done"
 
-# Только fast-forward — никаких случайных merge-коммитов на сервере.
-git pull --ff-only --quiet origin "$BRANCH"
-
-# Пересобрать образы и пересоздать изменившиеся сервисы (backend/frontend/redis).
-log "rebuilding and restarting containers..."
-docker compose up -d --build >>"$LOG" 2>&1
-
-log "done, now at $(git rev-parse --short HEAD)"
-
-# Подчистить висячие образы от прошлых сборок, чтобы не копился мусор.
+# Подчистить висячие образы от прошлых версий, чтобы не копился мусор на диске.
 docker image prune -f >>"$LOG" 2>&1 || true

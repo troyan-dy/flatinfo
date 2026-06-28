@@ -78,21 +78,34 @@ loopback (`127.0.0.1:3000` / `:8000`) — снаружи их закрывает
 Интернет :443 ──► nginx (TLS, по server_name) ──► 127.0.0.1:3000 (frontend) ──► backend
 ```
 
-Сервер маленький (~1 ГБ RAM, ~10 ГБ диск): для сборки включён swap (`/swapfile`,
-в `/etc/fstab`), а фронтенд собирается с `output: "standalone"` — иначе `next build`
-падает по памяти/диску.
+### CI/CD: образы собирает GitHub, сервер их только тянет
+
+Сервер маленький (~1 ГБ RAM, ~10 ГБ диск) — собирать образы на нём дорого. Поэтому
+сборка вынесена в **GitHub Actions** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
+
+1. На каждый push/PR гоняются проверки — бэкенд (ruff + mypy + pytest, покрытие ≥85%)
+   и фронтенд (typecheck + build).
+2. После зелёных проверок **на `master`** собираются и пушатся образы в
+   **GHCR** (публичные, авторизация не нужна):
+   `ghcr.io/troyan-dy/flatinfo-backend:latest` и `…-frontend:latest`
+   (плюс метка с точным commit SHA — для отката).
+
+На сервере используется [`docker-compose.prod.yml`](docker-compose.prod.yml): он не
+собирает образы, а **тянет готовые** из GHCR. Фронтенд по-прежнему `output:
+"standalone"` — лёгкий рантайм-образ ~200 МБ.
 
 ### Первая установка
 
 Нужны Docker + плагин compose, nginx, certbot.
 
 ```bash
-# 1. Код (репозиторий публичный, ключи не нужны)
+# 1. Код — нужен один раз, ради compose- и nginx-конфигов (репозиторий публичный)
 cd ~ && git clone https://github.com/troyan-dy/flatinfo.git
 cd ~/flatinfo
 
-# 2. Поднять контейнеры
-docker compose up --build -d
+# 2. Поднять контейнеры из готовых образов GHCR (без локальной сборки)
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 
 # 3. nginx: подключить конфиг (на старте — без TLS, см. ниже про HTTPS)
 ln -s ~/flatinfo/deploy/nginx/flatinfo.conf /etc/nginx/sites-enabled/flatinfo.conf
@@ -134,10 +147,11 @@ ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw --force enable
 
 ### Авто-деплой (cron)
 
-[`deploy/auto-update.sh`](deploy/auto-update.sh) раз в несколько минут тянет `master`
-и, **только если код изменился**, пересобирает и пересоздаёт контейнеры. Если новых
-коммитов нет — тихо выходит. Защищён `flock` от наложения запусков, пишет в
-`deploy/auto-update.log`.
+[`deploy/auto-update.sh`](deploy/auto-update.sh) раз в несколько минут тянет свежие
+образы из GHCR и, **только если они изменились**, пересоздаёт контейнеры
+(`docker compose -f docker-compose.prod.yml pull && up -d`). Никакой сборки и `git`
+на сервере: образы готовит CI. Если образы те же — тихо выходит. Защищён `flock` от
+наложения запусков, пишет в `deploy/auto-update.log`.
 
 ```bash
 crontab -e
