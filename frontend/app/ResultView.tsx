@@ -23,6 +23,46 @@ function headline(rec: string, advantage: number, horizon: number, currency: str
   return `Разница всего ${sum} за ${horizon} лет`;
 }
 
+/** Контекстные причины вердикта по соотношениям входных параметров. */
+function reasons(a: {
+  home_price: number;
+  monthly_rent: number;
+  mortgage_rate: number;
+  home_appreciation: number;
+  investment_return: number;
+}): string[] {
+  const out: string[] = [];
+  const ratio = a.home_price / (a.monthly_rent * 12); // цена / годовая аренда
+  if (ratio >= 25) {
+    out.push(
+      `Жильё дорогое относительно аренды: цена ≈ ${ratio.toFixed(0)} годовых аренд (> 25) — снимать дёшево.`,
+    );
+  } else if (ratio <= 15) {
+    out.push(
+      `Аренда дорогая относительно цены: цена ≈ ${ratio.toFixed(0)} годовых аренд (< 15) — покупка окупается быстро.`,
+    );
+  } else {
+    out.push(`Цена ≈ ${ratio.toFixed(0)} годовых аренд — пограничное соотношение.`);
+  }
+
+  if (a.investment_return - a.home_appreciation >= 0.03) {
+    out.push(
+      `Вложения доходнее роста жилья (${pct(a.investment_return, 0)} против ${pct(a.home_appreciation, 0)}/год) — деньги выгоднее инвестировать, чем держать в недвижимости.`,
+    );
+  } else if (a.home_appreciation - a.investment_return >= 0.01) {
+    out.push(
+      `Жильё растёт быстрее типичных вложений (${pct(a.home_appreciation, 0)} против ${pct(a.investment_return, 0)}/год) — в пользу покупки.`,
+    );
+  }
+
+  if (a.mortgage_rate >= 0.12) {
+    out.push(`Высокая ставка ипотеки (${pct(a.mortgage_rate, 0)}) удорожает покупку.`);
+  } else if (a.mortgage_rate <= 0.05) {
+    out.push(`Низкая ставка ипотеки (${pct(a.mortgage_rate, 0)}) делает кредит дешёвым.`);
+  }
+  return out;
+}
+
 export default async function ResultView({
   address,
   overrides,
@@ -72,6 +112,16 @@ export default async function ResultView({
             <div className="value">{money(result.monthly_mortgage, cur)}/мес</div>
           </div>
         </div>
+      </div>
+
+      <div className="section">
+        <h3>Почему так</h3>
+        <p className="hint">Главные факторы, повлиявшие на вердикт.</p>
+        <ul className="reasons">
+          {reasons(assumptions).map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
       </div>
 
       <div className="section">

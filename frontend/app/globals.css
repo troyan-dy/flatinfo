@@ -406,6 +406,24 @@ a {
   border-radius: 10px;
 }
 
+.reasons {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reasons li {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.reasons li::marker {
+  color: var(--accent);
+}
+
 .error {
   margin-top: 24px;
   border: 1px solid rgba(248, 113, 113, 0.45);
@@ -443,6 +461,33 @@ table.breakdown td:first-child {
 
 table.breakdown tr:last-child td {
   border-bottom: none;
+}
+
+/* --- адаптив под мобилки --- */
+@media (max-width: 560px) {
+  .container {
+    padding: 28px 14px 60px;
+  }
+
+  .search {
+    flex-direction: column;
+  }
+
+  .search .btn {
+    width: 100%;
+  }
+
+  .verdict {
+    padding: 20px;
+  }
+
+  .verdict h2 {
+    font-size: 23px;
+  }
+
+  .lede {
+    font-size: 16px;
+  }
 }
 
 /* --- скелетон загрузки --- */
