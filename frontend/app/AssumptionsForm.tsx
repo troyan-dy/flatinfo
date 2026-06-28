@@ -48,7 +48,6 @@ function toDisplay(field: Field, value: number): string {
 
 export default function AssumptionsForm({ address, assumptions }: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const f of FIELDS) init[f.key] = toDisplay(f, assumptions[f.key] as number);
@@ -86,36 +85,30 @@ export default function AssumptionsForm({ address, assumptions }: Props) {
         пересчитается мгновенно.
       </p>
 
-      {!open ? (
-        <button className="btn secondary" onClick={() => setOpen(true)} type="button">
-          Настроить параметры
-        </button>
-      ) : (
-        <form onSubmit={submit}>
-          <div className="assump-grid">
-            {FIELDS.map((f) => (
-              <div className="field" key={f.key}>
-                <label htmlFor={f.key}>{f.label}</label>
-                <input
-                  id={f.key}
-                  type="text"
-                  inputMode="decimal"
-                  value={values[f.key] ?? ""}
-                  onChange={(e) => update(f.key, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="form-actions">
-            <button className="btn" type="submit">
-              Пересчитать
-            </button>
-            <button className="btn secondary" type="button" onClick={reset}>
-              Сбросить
-            </button>
-          </div>
-        </form>
-      )}
+      <form onSubmit={submit}>
+        <div className="assump-grid">
+          {FIELDS.map((f) => (
+            <div className="field" key={f.key}>
+              <label htmlFor={f.key}>{f.label}</label>
+              <input
+                id={f.key}
+                type="text"
+                inputMode="decimal"
+                value={values[f.key] ?? ""}
+                onChange={(e) => update(f.key, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="form-actions">
+          <button className="btn" type="submit">
+            Пересчитать
+          </button>
+          <button className="btn secondary" type="button" onClick={reset}>
+            Сбросить
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

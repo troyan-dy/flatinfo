@@ -24,6 +24,11 @@ yarn-error.log*
 .env.local
 .env*.local
 
+# Deploy runtime (создаётся auto-update.sh / cron на сервере)
+deploy/auto-update.log
+deploy/cron.log
+deploy/.auto-update.lock
+
 # OS / editors
 .DS_Store
 *.swp

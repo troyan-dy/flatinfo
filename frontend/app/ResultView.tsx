@@ -10,12 +10,6 @@ const REC_LABEL: Record<string, string> = {
   neutral: "Примерно поровну",
 };
 
-const SOURCE_NOTE: Record<string, string> = {
-  city: "Оценка для конкретного города",
-  country: "Оценка по стране (нет точных данных по городу) — проверьте цены и аренду",
-  global: "Глобальная усреднённая оценка — обязательно подставьте реальные цифры",
-};
-
 function headline(rec: string, advantage: number, horizon: number, currency: string): string {
   const sum = money(Math.abs(advantage), currency);
   if (rec === "buy") return `Покупка выгоднее на ${sum}`;
@@ -161,48 +155,6 @@ export default async function ResultView({
             </tr>
           </tbody>
         </table>
-      </div>
-
-      <div className="section">
-        <h3>Исходные данные</h3>
-        <p className="hint">Оценки рынка для этой локации, на которых построен расчёт.</p>
-        <table className="breakdown">
-          <tbody>
-            <tr>
-              <td>Площадь</td>
-              <td>{Math.round(assumptions.area_sqm)} м²</td>
-            </tr>
-            <tr>
-              <td>Цена покупки</td>
-              <td>{money(assumptions.home_price, cur)}</td>
-            </tr>
-            <tr>
-              <td>Аренда в месяц</td>
-              <td>{money(assumptions.monthly_rent, cur)}</td>
-            </tr>
-            <tr>
-              <td>Ставка ипотеки</td>
-              <td>{pct(assumptions.mortgage_rate)}</td>
-            </tr>
-            <tr>
-              <td>Первый взнос</td>
-              <td>{pct(assumptions.down_payment_pct)}</td>
-            </tr>
-            <tr>
-              <td>Рост цен на жильё</td>
-              <td>{pct(assumptions.home_appreciation)}/год</td>
-            </tr>
-            <tr>
-              <td>Рост аренды</td>
-              <td>{pct(assumptions.rent_growth)}/год</td>
-            </tr>
-            <tr>
-              <td>Доходность вложений</td>
-              <td>{pct(assumptions.investment_return)}/год</td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="source-note">{SOURCE_NOTE[assumptions.data_source]}</div>
       </div>
 
       <AssumptionsForm address={address} assumptions={assumptions} />

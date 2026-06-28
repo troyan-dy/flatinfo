@@ -6,8 +6,10 @@ services:
 
   backend:
     build: ./backend
+    # Порт публикуется только на loopback хоста: снаружи бэкенд недоступен,
+    # фронтенд ходит к нему по внутренней сети compose (http://backend:8000).
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
       REDIS_URL: "redis://redis:6379/0"
@@ -17,8 +19,10 @@ services:
 
   frontend:
     build: ./frontend
+    # Только loopback хоста: наружу фронтенд публикует общий nginx (reverse-proxy
+    # на :80/:443), см. deploy/nginx/flatinfo.conf. Так на сервере живёт мультисайт.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       # Внутри сети compose фронт ходит на бэкенд по имени сервиса.
       BACKEND_URL: "http://backend:8000"
