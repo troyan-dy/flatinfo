@@ -135,4 +135,14 @@ async def suggest(
         if own_client:
             await client.aclose()
 
-    return [_parse(item) for item in data if item.get("lat") and item.get("lon")]
+    seen: set[str] = set()
+    result: list[GeoLocation] = []
+    for item in data:
+        if not (item.get("lat") and item.get("lon")):
+            continue
+        loc = _parse(item)
+        if loc.display_name in seen:  # Nominatim иногда дублирует (город + граница)
+            continue
+        seen.add(loc.display_name)
+        result.append(loc)
+    return result
