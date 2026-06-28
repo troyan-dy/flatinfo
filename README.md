@@ -43,6 +43,15 @@ npm run dev
 
 Фронт ходит на бэкенд по `BACKEND_URL` (по умолчанию `http://localhost:8000`).
 
+Или всё сразу в Docker:
+
+```bash
+docker compose up --build      # бэк :8000, фронт :3000
+```
+
+Короткие команды — в `Makefile`: `make check` (lint+types+test бэка),
+`make back`, `make front`, `make dev` (docker).
+
 ## Проверки
 
 ```bash
