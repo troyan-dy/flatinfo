@@ -68,6 +68,27 @@ def test_equity_grows_as_loan_amortizes() -> None:
     assert res.timeline[-1].home_equity > res.timeline[0].home_equity
 
 
+def test_zero_down_payment_full_mortgage() -> None:
+    # 0% взнос: арендатор стартует без портфеля, ипотека на всю цену.
+    res = analyze(_base(down_payment_pct=0.0))
+    assert res.monthly_mortgage > 0
+    assert len(res.timeline) == 10
+    assert res.timeline[0].loan_balance < res.timeline[0].home_value
+
+
+def test_one_year_horizon() -> None:
+    res = analyze(_base(horizon_years=1))
+    assert len(res.timeline) == 1
+    assert res.recommendation in {"buy", "rent", "neutral"}
+
+
+def test_full_cash_purchase_no_loan() -> None:
+    # 100% взнос → кредита нет, платёж 0.
+    res = analyze(_base(down_payment_pct=1.0))
+    assert res.monthly_mortgage == 0.0
+    assert res.timeline[-1].loan_balance == 0.0
+
+
 def test_neutral_zone() -> None:
     # Подбор: разница около нуля даёт neutral. Проверяем сам факт классификации.
     res = analyze(_base())
