@@ -406,6 +406,34 @@ a {
   border-radius: 10px;
 }
 
+.how {
+  margin-top: 28px;
+}
+
+.how-steps {
+  margin: 0 0 14px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  counter-reset: step;
+}
+
+.how-steps li {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.how-steps li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.how-steps b {
+  color: var(--text);
+}
+
 .reasons {
   margin: 0;
   padding-left: 22px;
