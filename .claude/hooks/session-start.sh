@@ -1,6 +1,6 @@
 #!/bin/bash
 # SessionStart-хук для облачных сессий Claude Code: ставит зависимости бэкенда
-# (uv) и фронтенда (npm), чтобы сразу работали ruff/mypy/pytest и tsc/next build.
+# (uv) и фронтенда (npm), чтобы сразу работали ruff/WPS/mypy/pytest и tsc/next build.
 # Локально ничего не делает. Идемпотентен: повторный запуск — быстрый no-op.
 set -euo pipefail
 
@@ -19,6 +19,11 @@ if ! command -v uv >/dev/null 2>&1; then
   fi
 fi
 (cd "$ROOT/backend" && uv sync --frozen)
+
+# WPS (wemake-python-styleguide): прогон для сводки на старте; нарушения не
+# блокируют сессию — их видно сразу, а CI и `make check` всё равно упадут.
+(cd "$ROOT/backend" && uv run flake8 app tests --select=WPS) \
+  || echo "WPS: есть нарушения — см. вывод выше (make wps)" >&2
 
 # Фронтенд: npm install (а не ci) — переиспользует node_modules из кэша контейнера.
 (cd "$ROOT/frontend" && npm install --no-audit --no-fund)

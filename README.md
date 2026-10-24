@@ -23,7 +23,7 @@
 ## Стек
 
 - **Бэкенд:** FastAPI, Pydantic, httpx, loguru. Менеджер пакетов — `uv`.
-  Линт/типы/тесты: ruff + mypy + pytest (покрытие ≥85%).
+  Линт/типы/тесты: ruff + wemake-python-styleguide + mypy + pytest (покрытие ≥85%).
   Кэш ответов — Redis (необязательный: без него сервис просто пересчитывает).
 - **Фронтенд:** Next.js 15 (App Router, **SSR**), React 19, TypeScript. График —
   собственный SVG без тяжёлых зависимостей.
@@ -55,13 +55,14 @@ npm run dev
 docker compose up --build      # бэк :8000, фронт :3000, redis :6379
 ```
 
-Короткие команды — в `Makefile`: `make check` (lint+types+test бэка),
+Короткие команды — в `Makefile`: `make check` (lint+WPS+types+test бэка),
 `make back`, `make front`, `make dev` (docker).
 
 ## Проверки
 
 ```bash
-cd backend && uv run ruff check . && uv run mypy && uv run pytest -q
+cd backend && uv run ruff check . && uv run flake8 app tests --select=WPS \
+  && uv run mypy && uv run pytest -q
 cd frontend && npm run typecheck && npm run build
 ```
 
@@ -83,7 +84,7 @@ loopback (`127.0.0.1:3000` / `:8000`) — снаружи их закрывает
 Сервер маленький (~1 ГБ RAM, ~10 ГБ диск) — собирать образы на нём дорого. Поэтому
 сборка вынесена в **GitHub Actions** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
 
-1. На каждый push/PR гоняются проверки — бэкенд (ruff + mypy + pytest, покрытие ≥85%)
+1. На каждый push/PR гоняются проверки — бэкенд (ruff + WPS + mypy + pytest, покрытие ≥85%)
    и фронтенд (typecheck + build).
 2. После зелёных проверок **на `master`** собираются и пушатся образы в
    **GHCR** (публичные, авторизация не нужна):

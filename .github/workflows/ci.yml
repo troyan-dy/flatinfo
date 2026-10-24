@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 jobs:
-  # --- Бэкенд: lint + типы + тесты (как `make check`) ------------------------
+  # --- Бэкенд: lint + WPS + типы + тесты (как `make check`) ------------------------
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -30,6 +30,8 @@ jobs:
         run: uv sync --frozen
       - name: ruff
         run: uv run ruff check .
+      - name: wemake-python-styleguide
+        run: uv run flake8 app tests --select=WPS
       - name: mypy
         run: uv run mypy
       - name: pytest (покрытие ≥85%)
