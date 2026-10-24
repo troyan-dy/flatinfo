@@ -16,7 +16,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
         return GeoLocation(
             display_name="Berlin, Germany",
             lat=52.52,
-            lon=13.40,
+            lon=13.4,
             country_code="de",
             country="Germany",
             city="Berlin",
@@ -39,7 +39,7 @@ def test_analyze_ok(client: TestClient) -> None:
     assert body["result"]["recommendation"] in {"buy", "rent", "neutral"}
 
 
-def test_analyze_geocode_failure_returns_422(client: TestClient) -> None:
+def test_analyze_geocode_failure_is_unprocessable(client: TestClient) -> None:
     resp = client.post("/api/analyze", json={"address": "fail-address"})
     assert resp.status_code == 422
 
@@ -52,7 +52,7 @@ def test_analyze_validation_short_address(client: TestClient) -> None:
 def test_suggest_endpoint(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
     from app.services.geocode import GeoLocation
 
-    async def fake_suggest(q: str, limit: int = 5, c: object = None) -> list[GeoLocation]:
+    async def fake_suggest(query: str, limit: int = 5, client: object = None) -> list[GeoLocation]:
         return [
             GeoLocation(
                 display_name="Berlin, Germany",

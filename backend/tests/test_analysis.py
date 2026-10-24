@@ -1,18 +1,20 @@
+import pytest
+
 from app.analysis import Assumptions, analyze, monthly_mortgage_payment
 
 
 def test_mortgage_payment_known_value() -> None:
     # 100000 под 6% на 30 лет ≈ 599.55/мес
     pay = monthly_mortgage_payment(100_000, 0.06, 30)
-    assert abs(pay - 599.55) < 1.0
+    assert pay == pytest.approx(599.55, abs=1)
 
 
 def test_mortgage_zero_rate_is_linear() -> None:
-    assert monthly_mortgage_payment(120_000, 0.0, 10) == 120_000 / 120
+    assert monthly_mortgage_payment(120_000, 0, 10) == 120_000 / 120
 
 
 def test_mortgage_zero_loan() -> None:
-    assert monthly_mortgage_payment(0, 0.05, 20) == 0.0
+    assert monthly_mortgage_payment(0, 0.05, 20) == 0
 
 
 def _base(**kw: object) -> Assumptions:
@@ -40,16 +42,14 @@ def test_timeline_length_matches_horizon() -> None:
 
 
 def test_high_appreciation_favors_buying() -> None:
-    res = analyze(_base(home_appreciation=0.10, rent_growth=0.06))
+    res = analyze(_base(home_appreciation=0.1, rent_growth=0.06))
     assert res.recommendation == "buy"
     assert res.advantage > 0
 
 
-def test_high_rent_yield_and_low_appreciation_favors_renting() -> None:
+def test_cheap_rent_low_appreciation_favors_rent() -> None:
     # Дешёвая аренда относительно цены + слабый рост цен => снимать выгоднее.
-    res = analyze(
-        _base(monthly_rent=600, home_appreciation=0.0, investment_return=0.10)
-    )
+    res = analyze(_base(monthly_rent=600, home_appreciation=0, investment_return=0.1))
     assert res.recommendation == "rent"
     assert res.advantage < 0
 
@@ -63,14 +63,14 @@ def test_break_even_monotonic_buy_overtakes() -> None:
 
 def test_equity_grows_as_loan_amortizes() -> None:
     res = analyze(_base())
-    balances = [p.loan_balance for p in res.timeline]
+    balances = [point.loan_balance for point in res.timeline]
     assert balances == sorted(balances, reverse=True)  # долг убывает
     assert res.timeline[-1].home_equity > res.timeline[0].home_equity
 
 
 def test_zero_down_payment_full_mortgage() -> None:
     # 0% взнос: арендатор стартует без портфеля, ипотека на всю цену.
-    res = analyze(_base(down_payment_pct=0.0))
+    res = analyze(_base(down_payment_pct=0))
     assert res.monthly_mortgage > 0
     assert len(res.timeline) == 10
     assert res.timeline[0].loan_balance < res.timeline[0].home_value
@@ -85,8 +85,8 @@ def test_one_year_horizon() -> None:
 def test_full_cash_purchase_no_loan() -> None:
     # 100% взнос → кредита нет, платёж 0.
     res = analyze(_base(down_payment_pct=1.0))
-    assert res.monthly_mortgage == 0.0
-    assert res.timeline[-1].loan_balance == 0.0
+    assert res.monthly_mortgage == 0
+    assert res.timeline[-1].loan_balance == 0
 
 
 def test_neutral_zone() -> None:

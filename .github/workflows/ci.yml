@@ -13,22 +13,25 @@ permissions:
   packages: write
 
 jobs:
-  # --- Бэкенд: lint + типы + тесты (как `make check`) ------------------------
+  # --- Бэкенд: lint + WPS + типы + тесты (как `make check`) ------------------------
   backend:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Установить uv
-        uses: astral-sh/setup-uv@v6
+        # setup-uv больше не публикует плавающие мажорные теги — пиним точную версию.
+        uses: astral-sh/setup-uv@v10.3.2
         with:
           enable-cache: true
       - name: Зависимости
         run: uv sync --frozen
       - name: ruff
         run: uv run ruff check .
+      - name: wemake-python-styleguide
+        run: uv run flake8 app tests --select=WPS
       - name: mypy
         run: uv run mypy
       - name: pytest (покрытие ≥85%)
@@ -41,10 +44,10 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Зависимости
@@ -69,17 +72,17 @@ jobs:
           - name: frontend
             context: ./frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Логин в GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build & push ${{ matrix.name }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           push: true

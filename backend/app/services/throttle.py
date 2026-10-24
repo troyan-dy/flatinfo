@@ -15,7 +15,7 @@ class AsyncRateLimiter:
     def __init__(self, min_interval: float) -> None:
         self.min_interval = min_interval
         self._lock = asyncio.Lock()
-        self._last = 0.0
+        self._last = float(0)
 
     async def wait(self) -> None:
         if self.min_interval <= 0:

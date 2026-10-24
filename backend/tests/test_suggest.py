@@ -3,12 +3,12 @@ import httpx
 from app.services import geocode as geo
 
 
-def _client(handler: object) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=httpx.MockTransport(handler))  # type: ignore[arg-type]
+def _client(responder: object) -> httpx.AsyncClient:
+    return httpx.AsyncClient(transport=httpx.MockTransport(responder))  # type: ignore[arg-type]
 
 
 async def test_suggest_returns_multiple() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
             json=[
@@ -27,7 +27,7 @@ async def test_suggest_returns_multiple() -> None:
             ],
         )
 
-    async with _client(handler) as client:
+    async with _client(respond) as client:
         res = await geo.suggest("Моск", client=client)
         assert len(res) == 2
         assert res[0].city == "Москва"
@@ -39,16 +39,16 @@ async def test_suggest_too_short_returns_empty() -> None:
 
 
 async def test_suggest_http_error_returns_empty() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503)
 
-    async with _client(handler) as client:
+    async with _client(respond) as client:
         res = await geo.suggest("Берлин", client=client)
         assert res == []
 
 
 async def test_suggest_skips_items_without_coords() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
             json=[
@@ -62,7 +62,7 @@ async def test_suggest_skips_items_without_coords() -> None:
             ],
         )
 
-    async with _client(handler) as client:
+    async with _client(respond) as client:
         res = await geo.suggest("test", client=client)
         assert len(res) == 1
         assert res[0].display_name == "ok"

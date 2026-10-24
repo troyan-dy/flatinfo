@@ -42,7 +42,7 @@ async def test_overrides_applied(patched_geocode: None) -> None:
     resp = await run_analysis(req)
     assert resp.assumptions.area_sqm == 100
     assert resp.assumptions.horizon_years == 5
-    assert resp.assumptions.mortgage_rate == 0.05
+    assert resp.assumptions.mortgage_rate == pytest.approx(0.05)
     assert len(resp.result.timeline) == 5
 
 

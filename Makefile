@@ -1,10 +1,14 @@
-.PHONY: check lint types test back front dev
+.PHONY: check lint wps types test back front dev
 
 # Все проверки бэкенда одной командой.
-check: lint types test
+check: lint wps types test
 
 lint:
 	cd backend && uv run ruff check .
+
+# wemake-python-styleguide (flake8 только как раннер WPS, конфиг — backend/setup.cfg).
+wps:
+	cd backend && uv run flake8 app tests --select=WPS
 
 types:
 	cd backend && uv run mypy

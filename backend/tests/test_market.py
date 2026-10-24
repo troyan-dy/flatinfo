@@ -4,7 +4,7 @@ from app.services.market import estimate_for
 
 def _loc(cc: str, city: str | None) -> GeoLocation:
     return GeoLocation(
-        display_name="x", lat=0.0, lon=0.0, country_code=cc, country=cc.upper(), city=city
+        display_name="x", lat=0, lon=0, country_code=cc, country=cc.upper(), city=city
     )
 
 

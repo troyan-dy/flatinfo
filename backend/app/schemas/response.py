@@ -1,30 +1,8 @@
-"""Pydantic-схемы запроса/ответа API."""
+"""Pydantic-схемы ответов API."""
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
-
-class Overrides(BaseModel):
-    """Необязательные ручные правки допущений. Любое поле может быть None."""
-
-    area_sqm: float | None = Field(default=None, gt=5, le=1000)
-    horizon_years: int | None = Field(default=None, ge=1, le=40)
-    home_price: float | None = Field(default=None, gt=0)
-    monthly_rent: float | None = Field(default=None, gt=0)
-    down_payment_pct: float | None = Field(default=None, ge=0, le=1)
-    mortgage_rate: float | None = Field(default=None, ge=0, le=1)
-    loan_term_years: int | None = Field(default=None, ge=1, le=40)
-    property_tax_rate: float | None = Field(default=None, ge=0, le=0.2)
-    maintenance_rate: float | None = Field(default=None, ge=0, le=0.2)
-    home_appreciation: float | None = Field(default=None, ge=-0.2, le=1)
-    rent_growth: float | None = Field(default=None, ge=-0.2, le=1)
-    investment_return: float | None = Field(default=None, ge=-0.2, le=1)
-
-
-class AnalyzeRequest(BaseModel):
-    address: str = Field(min_length=2, max_length=300)
-    overrides: Overrides = Field(default_factory=Overrides)
+from pydantic import BaseModel
 
 
 class Suggestion(BaseModel):
@@ -86,5 +64,6 @@ class ResultOut(BaseModel):
 class AnalyzeResponse(BaseModel):
     location: LocationOut
     assumptions: AssumptionsOut
-    result: ResultOut
+    # Имя поля — часть публичного JSON-контракта /api/analyze (фронт читает `result`).
+    result: ResultOut  # noqa: WPS110
     summary: str  # человекочитаемый вывод на русском

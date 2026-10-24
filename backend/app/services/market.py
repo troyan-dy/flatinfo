@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.market_data import CITY, COUNTRY, GLOBAL_FALLBACK, CountryProfile
+from app.market_data import CITY, COUNTRY, GLOBAL_FALLBACK
 from app.services.geocode import GeoLocation
 
 
@@ -38,22 +38,33 @@ def _normalize(name: str) -> str:
     return name.strip().lower()
 
 
+def _city_prices(location: GeoLocation) -> tuple[float, float] | None:
+    """Цена и аренда за м² из CITY, если город известен базе."""
+    if not location.city:
+        return None
+    return CITY.get((location.country_code, _normalize(location.city)))
+
+
+def _source(country_code: str, city_prices: tuple[float, float] | None) -> str:
+    if city_prices is not None:
+        return "city"
+    if country_code in COUNTRY:
+        return "country"
+    return "global"
+
+
+def _country_label(location: GeoLocation) -> str | None:
+    if location.country:
+        return location.country
+    if location.country_code:
+        return location.country_code.upper()
+    return None
+
+
 def estimate_for(location: GeoLocation) -> MarketEstimate:
-    cc = location.country_code
-    profile: CountryProfile = COUNTRY.get(cc, GLOBAL_FALLBACK)
-    source = "country" if cc in COUNTRY else "global"
-
-    buy = profile.buy_per_sqm
-    rent = profile.rent_per_sqm
-    matched_city: str | None = None
-
-    if location.city:
-        key = (cc, _normalize(location.city))
-        if key in CITY:
-            buy, rent = CITY[key]
-            source = "city"
-            matched_city = location.city
-
+    profile = COUNTRY.get(location.country_code, GLOBAL_FALLBACK)
+    city_prices = _city_prices(location)
+    buy, rent = city_prices or (profile.buy_per_sqm, profile.rent_per_sqm)
     return MarketEstimate(
         currency=profile.currency,
         buy_per_sqm=buy,
@@ -65,7 +76,7 @@ def estimate_for(location: GeoLocation) -> MarketEstimate:
         investment_return=profile.investment_return,
         buy_closing_pct=profile.buy_closing_pct,
         sell_closing_pct=profile.sell_closing_pct,
-        source=source,
-        matched_city=matched_city,
-        matched_country=location.country or (cc.upper() if cc else None),
+        source=_source(location.country_code, city_prices),
+        matched_city=None if city_prices is None else location.city,
+        matched_country=_country_label(location),
     )

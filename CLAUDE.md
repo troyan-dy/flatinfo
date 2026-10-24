@@ -36,7 +36,8 @@
 ## Архитектура
 
 - `backend/app/` — `config.py` (pydantic-settings), `analysis.py` (модель, без I/O),
-  `market_data.py` (таблицы стран/городов), `schemas.py` (Pydantic API),
+  `market_data.py` (таблицы стран/городов), `schemas/` (Pydantic API: `request.py`,
+  `response.py`, реэкспорт в `__init__`),
   `api.py` (роуты `/api/health`, `/api/analyze`), `services/` (geocode, market, advisor,
   cache), `main.py` (FastAPI + CORS + lifespan для закрытия пула Redis).
 - Кэш ответов: `services/cache.py` — обёртка над `redis.asyncio`. Эндпоинт
@@ -59,7 +60,7 @@
 # бэкенд
 cd backend && uv sync
 uv run uvicorn app.main:app --reload      # http://localhost:8000, /docs
-uv run ruff check . && uv run mypy && uv run pytest -q
+uv run ruff check . && uv run flake8 app tests --select=WPS && uv run mypy && uv run pytest -q
 
 # фронтенд
 cd frontend && npm install
@@ -74,5 +75,9 @@ npm run typecheck && npm run build
 - Рыночные данные — **оценки**, не котировки. Любую цифру пользователь правит руками;
   это не инвестиционный совет. При добавлении страны/города правим `market_data.py`
   и (если новая валюта) `SYMBOLS` в `lib/format.ts`.
+- Python-код проходит **wemake-python-styleguide** (WPS) с 0 нарушений: `make wps`,
+  конфиг `[flake8]` в `backend/setup.cfg` (там же per-file-ignores для тестов).
+  Нарушение чиним кодом; `# noqa: WPSxxx` — только когда фикс меняет публичный
+  API/формат или противоречит конвенциям фреймворка, и всегда с комментарием-причиной.
 - npm-реестр: при недоступности корпоративного `artifactory.s.o3.ru` ставим из
   публичного (`frontend/.npmrc` → `registry.npmjs.org`).
