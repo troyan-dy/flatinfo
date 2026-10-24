@@ -9,12 +9,20 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 from loguru import logger
 
 from app.config import settings
 from app.services.throttle import AsyncRateLimiter
+
+# Поля адреса Nominatim, из которых берём «город» — от точного к общему.
+_CITY_KEYS = ("city", "town", "village", "municipality", "county", "state")
+
+# Автодополнение: короче — не ищем, больше вариантов — не просим.
+_MIN_SUGGEST_LENGTH = 3
+_MAX_SUGGEST_LIMIT = 10
 
 # Общий лимитер на все исходящие запросы к геокодеру (geocode + suggest).
 _limiter = AsyncRateLimiter(settings.geocoder_min_interval)
@@ -34,42 +42,59 @@ class GeocodeError(Exception):
     """Адрес не удалось геокодировать."""
 
 
-# Простой LRU поверх OrderedDict — без внешних зависимостей и потокобезопасно
-# в рамках одного event loop.
-_cache: OrderedDict[str, GeoLocation] = OrderedDict()
+class _LRUCache(OrderedDict[str, GeoLocation]):
+    """Простой LRU поверх OrderedDict — без внешних зависимостей.
+
+    Потокобезопасен в рамках одного event loop. Размер — `settings.geocode_cache_size`.
+    """
+
+    def lookup(self, key: str) -> GeoLocation | None:
+        location = self.get(key)
+        if location is not None:
+            self.move_to_end(key)
+        return location
+
+    def put(self, key: str, location: GeoLocation) -> None:
+        self[key] = location
+        self.move_to_end(key)
+        while len(self) > settings.geocode_cache_size:
+            self.popitem(last=False)
 
 
-def _cache_get(key: str) -> GeoLocation | None:
-    if key in _cache:
-        _cache.move_to_end(key)
-        return _cache[key]
-    return None
+_cache = _LRUCache()
 
 
-def _cache_put(key: str, value: GeoLocation) -> None:
-    _cache[key] = value
-    _cache.move_to_end(key)
-    while len(_cache) > settings.geocode_cache_size:
-        _cache.popitem(last=False)
-
-
-def _pick_city(address: dict[str, str]) -> str | None:
-    for key in ("city", "town", "village", "municipality", "county", "state"):
-        if address.get(key):
-            return address[key]
-    return None
-
-
-def _parse(item: dict) -> GeoLocation:
-    address = item.get("address", {})
+def _parse(place: dict[str, Any]) -> GeoLocation:
+    address = place.get("address", {})
     return GeoLocation(
-        display_name=item.get("display_name", ""),
-        lat=float(item["lat"]),
-        lon=float(item["lon"]),
+        display_name=place.get("display_name", ""),
+        lat=float(place["lat"]),
+        lon=float(place["lon"]),
         country_code=(address.get("country_code") or "").lower(),
         country=address.get("country", ""),
-        city=_pick_city(address),
+        city=next((address[key] for key in _CITY_KEYS if address.get(key)), None),
     )
+
+
+async def _request(query: str, limit: int, client: httpx.AsyncClient | None) -> Any:
+    """Один поиск в Nominatim. Ошибки сети/HTTP — `httpx.HTTPError`."""
+    if client is None:
+        async with httpx.AsyncClient(timeout=settings.geocoder_timeout) as own_client:
+            return await _request(query, limit, own_client)
+
+    await _limiter.wait()
+    response = await client.get(
+        settings.geocoder_url,
+        params={
+            "q": query,
+            "format": "jsonv2",
+            "limit": str(limit),
+            "addressdetails": "1",
+        },
+        headers={"User-Agent": settings.geocoder_user_agent},
+    )
+    response.raise_for_status()
+    return response.json()
 
 
 async def geocode(address: str, client: httpx.AsyncClient | None = None) -> GeoLocation:
@@ -77,78 +102,44 @@ async def geocode(address: str, client: httpx.AsyncClient | None = None) -> GeoL
     if not query:
         raise GeocodeError("Пустой адрес")
 
-    cached = _cache_get(query.lower())
+    cached = _cache.lookup(query.lower())
     if cached is not None:
         return cached
 
-    params = {
-        "q": query,
-        "format": "jsonv2",
-        "limit": "1",
-        "addressdetails": "1",
-    }
-    headers = {"User-Agent": settings.geocoder_user_agent}
-
-    own_client = client is None
-    client = client or httpx.AsyncClient(timeout=settings.geocoder_timeout)
     try:
-        await _limiter.wait()
-        resp = await client.get(settings.geocoder_url, params=params, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
+        places = await _request(query, 1, client)
     except httpx.HTTPError as exc:
         logger.warning("Geocoder request failed: {}", exc)
         raise GeocodeError("Сервис геокодирования недоступен") from exc
-    finally:
-        if own_client:
-            await client.aclose()
 
-    if not data:
+    if not places:
         raise GeocodeError(f"Не удалось найти адрес: {address}")
 
-    location = _parse(data[0])
-    _cache_put(query.lower(), location)
+    location = _parse(places[0])
+    _cache.put(query.lower(), location)
     return location
 
 
 async def suggest(
-    query: str, limit: int = 5, client: httpx.AsyncClient | None = None
+    query: str,
+    limit: int = 5,
+    client: httpx.AsyncClient | None = None,
 ) -> list[GeoLocation]:
     """Несколько вариантов адреса для автодополнения. Ошибки → пустой список."""
-    q = query.strip()
-    if len(q) < 3:
+    text = query.strip()
+    if len(text) < _MIN_SUGGEST_LENGTH:
         return []
 
-    params = {
-        "q": q,
-        "format": "jsonv2",
-        "limit": str(max(1, min(limit, 10))),
-        "addressdetails": "1",
-    }
-    headers = {"User-Agent": settings.geocoder_user_agent}
-
-    own_client = client is None
-    client = client or httpx.AsyncClient(timeout=settings.geocoder_timeout)
     try:
-        await _limiter.wait()
-        resp = await client.get(settings.geocoder_url, params=params, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
+        places = await _request(text, max(1, min(limit, _MAX_SUGGEST_LIMIT)), client)
     except httpx.HTTPError as exc:
         logger.warning("Geocoder suggest failed: {}", exc)
         return []
-    finally:
-        if own_client:
-            await client.aclose()
 
-    seen: set[str] = set()
-    result: list[GeoLocation] = []
-    for item in data:
-        if not (item.get("lat") and item.get("lon")):
-            continue
-        loc = _parse(item)
-        if loc.display_name in seen:  # Nominatim иногда дублирует (город + граница)
-            continue
-        seen.add(loc.display_name)
-        result.append(loc)
-    return result
+    # Nominatim иногда дублирует (город + граница) — оставляем первый вариант.
+    unique: dict[str, GeoLocation] = {}
+    for place in places:
+        if place.get("lat") and place.get("lon"):
+            location = _parse(place)
+            unique.setdefault(location.display_name, location)
+    return list(unique.values())

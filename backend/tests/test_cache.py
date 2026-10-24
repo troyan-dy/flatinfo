@@ -17,7 +17,7 @@ def _fake_location() -> GeoLocation:
     return GeoLocation(
         display_name="Berlin, Germany",
         lat=52.52,
-        lon=13.40,
+        lon=13.4,
         country_code="de",
         country="Germany",
         city="Berlin",
@@ -34,9 +34,11 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 
 def test_make_key_stable_and_order_independent() -> None:
-    k1 = cache.make_key("analyze:v1", {"address": "berlin", "overrides": {"a": 1, "b": 2}})
-    k2 = cache.make_key("analyze:v1", {"overrides": {"b": 2, "a": 1}, "address": "berlin"})
-    k3 = cache.make_key("analyze:v1", {"address": "munich", "overrides": {"a": 1, "b": 2}})
+    overrides = {"a": 1, "b": 2}
+    reordered = {"b": 2, "a": 1}
+    k1 = cache.make_key("analyze:v1", {"address": "berlin", "overrides": overrides})
+    k2 = cache.make_key("analyze:v1", {"overrides": reordered, "address": "berlin"})
+    k3 = cache.make_key("analyze:v1", {"address": "munich", "overrides": overrides})
     assert k1 == k2  # порядок ключей не влияет
     assert k1 != k3  # разные данные → разный ключ
     assert k1.startswith("analyze:v1:")
@@ -106,11 +108,11 @@ def test_analyze_cache_miss_stores_result(
     stored: dict[str, Any] = {}
 
     async def fake_get(key: str) -> None:
-        return None
+        """Промах кэша."""
 
-    async def fake_set(key: str, value: dict[str, Any], ttl: int) -> None:
+    async def fake_set(key: str, document: dict[str, Any], ttl: int) -> None:
         stored["key"] = key
-        stored["value"] = value
+        stored["value"] = document
         stored["ttl"] = ttl
 
     monkeypatch.setattr("app.api.cache.get_json", fake_get)
