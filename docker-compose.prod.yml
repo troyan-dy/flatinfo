@@ -4,7 +4,7 @@
 # (deploy/auto-update.sh). Локальная сборка — в обычном docker-compose.yml.
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     # Кэш эфемерный: том не нужен, потеря безопасна (всё пересчитается).
     restart: unless-stopped
 
